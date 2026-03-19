@@ -1,536 +1,313 @@
 """
-Creates a Google Slides presentation about different types of cars and their benefits.
+Creates car_types_presentation.pptx using python-pptx.
 
-Requirements:
-    pip install google-api-python-client google-auth-httplib2 google-auth-oauthlib
+Install: pip install python-pptx
+Run:     python create_car_presentation.py
 
-Setup:
-    1. Go to https://console.cloud.google.com/
-    2. Create a project and enable the Google Slides API
-    3. Create OAuth 2.0 credentials and download as 'credentials.json'
-    4. Place credentials.json in the same directory as this script
-    5. Run the script — it will open a browser for authentication on first run
+Then import the .pptx into Google Slides:
+  slides.google.com → File → Import slides  (or drag into Drive)
 """
 
-import os
-import json
-from google.auth.transport.requests import Request
-from google.oauth2.credentials import Credentials
-from google_auth_oauthlib.flow import InstalledAppFlow
-from googleapiclient.discovery import build
+from pptx import Presentation
+from pptx.util import Inches, Pt
+from pptx.dml.color import RGBColor
+from pptx.enum.text import PP_ALIGN
 
-SCOPES = ["https://www.googleapis.com/auth/presentations"]
+# ---------------------------------------------------------------------------
+# Colour palette
+# ---------------------------------------------------------------------------
+
+DARK_BLUE   = RGBColor(0x14, 0x27, 0x4E)   # title / closing bg
+WHITE       = RGBColor(0xFF, 0xFF, 0xFF)
+GOLD        = RGBColor(0xFF, 0xD7, 0x00)
+LIGHT_GREY  = RGBColor(0xF4, 0xF6, 0xF9)   # content slide bg
+
+# Per-slide accent colours (title bar strip)
+ACCENTS = {
+    "Sedans":                    RGBColor(0x33, 0x66, 0xCC),
+    "SUVs":                      RGBColor(0x1E, 0x8A, 0x44),
+    "Pickup Trucks":             RGBColor(0xBF, 0x5A, 0x0E),
+    "Electric Vehicles (EVs)":   RGBColor(0x00, 0x99, 0x88),
+    "Hybrid Vehicles":           RGBColor(0x4C, 0xAF, 0x1A),
+    "Sports Cars":               RGBColor(0xCC, 0x1A, 0x1A),
+    "Minivans":                  RGBColor(0x7B, 0x2F, 0xBE),
+    "Luxury Vehicles":           RGBColor(0xA0, 0x7C, 0x10),
+    "Summary":                   GOLD,
+}
 
 # ---------------------------------------------------------------------------
 # Slide content
 # ---------------------------------------------------------------------------
 
-SLIDES = [
-    {
-        "title": "Types of Cars & Their Benefits",
-        "subtitle": "A comprehensive guide to choosing the right vehicle for you",
-        "layout": "title",
-        "bg_color": {"red": 0.08, "green": 0.15, "blue": 0.30},
-        "title_color": {"red": 1.0, "green": 1.0, "blue": 1.0},
-        "body_color": {"red": 0.75, "green": 0.85, "blue": 1.0},
-    },
+CONTENT_SLIDES = [
     {
         "title": "Sedans",
-        "body": (
-            "• Smooth, comfortable ride for daily commuting\n"
-            "• Excellent fuel efficiency — lower running costs\n"
-            "• Easy to park in urban environments\n"
-            "• Typically lower purchase price vs. SUVs\n"
-            "• Wide model variety (compact, mid-size, full-size)\n"
-            "• Best for: Commuters, families, budget-conscious drivers"
-        ),
-        "layout": "body",
-        "bg_color": {"red": 0.95, "green": 0.97, "blue": 1.0},
-        "title_color": {"red": 0.08, "green": 0.15, "blue": 0.40},
-        "body_color": {"red": 0.15, "green": 0.15, "blue": 0.15},
-        "accent": {"red": 0.20, "green": 0.40, "blue": 0.80},
+        "bullets": [
+            "Smooth, comfortable ride for daily commuting",
+            "Excellent fuel efficiency — lower running costs",
+            "Easy to park in urban environments",
+            "Typically lower purchase price vs. SUVs",
+            "Wide model variety: compact, mid-size, full-size",
+            "Best for: commuters, families, budget-conscious drivers",
+        ],
     },
     {
-        "title": "SUVs (Sport Utility Vehicles)",
-        "body": (
-            "• Higher seating position with better road visibility\n"
-            "• Spacious interior — ideal for families and cargo\n"
-            "• Available in AWD/4WD for off-road capability\n"
-            "• Towing capacity for trailers and boats\n"
-            "• Enhanced safety with larger crumple zones\n"
-            "• Best for: Families, adventurers, outdoor enthusiasts"
-        ),
-        "layout": "body",
-        "bg_color": {"red": 0.95, "green": 1.0, "blue": 0.96},
-        "title_color": {"red": 0.05, "green": 0.35, "blue": 0.15},
-        "body_color": {"red": 0.15, "green": 0.15, "blue": 0.15},
-        "accent": {"red": 0.10, "green": 0.55, "blue": 0.25},
+        "title": "SUVs",
+        "bullets": [
+            "Higher seating position with better road visibility",
+            "Spacious interior — ideal for families and cargo",
+            "Available in AWD/4WD for off-road capability",
+            "Strong towing capacity for trailers and boats",
+            "Enhanced safety with larger crumple zones",
+            "Best for: families, adventurers, outdoor enthusiasts",
+        ],
     },
     {
         "title": "Pickup Trucks",
-        "body": (
-            "• High towing and payload capacity\n"
-            "• Versatile bed for hauling equipment and materials\n"
-            "• Rugged 4WD systems for tough terrain\n"
-            "• Durable build for work and commercial use\n"
-            "• Modern trucks offer car-like comfort features\n"
-            "• Best for: Contractors, farmers, towing, off-road driving"
-        ),
-        "layout": "body",
-        "bg_color": {"red": 1.0, "green": 0.96, "blue": 0.92},
-        "title_color": {"red": 0.45, "green": 0.20, "blue": 0.05},
-        "body_color": {"red": 0.15, "green": 0.15, "blue": 0.15},
-        "accent": {"red": 0.75, "green": 0.35, "blue": 0.05},
+        "bullets": [
+            "High towing and payload capacity",
+            "Versatile bed for hauling equipment and materials",
+            "Rugged 4WD systems for tough terrain",
+            "Durable build suited for work and commercial use",
+            "Modern trucks offer car-like comfort and tech features",
+            "Best for: contractors, farmers, towing, off-road driving",
+        ],
     },
     {
         "title": "Electric Vehicles (EVs)",
-        "body": (
-            "• Zero tailpipe emissions — better for the environment\n"
-            "• Very low fuel cost (electricity vs. gasoline)\n"
-            "• Minimal maintenance — no oil changes needed\n"
-            "• Instant torque for responsive acceleration\n"
-            "• Eligible for government tax credits and incentives\n"
-            "• Best for: Eco-conscious drivers, city commuters, tech enthusiasts"
-        ),
-        "layout": "body",
-        "bg_color": {"red": 0.92, "green": 1.0, "blue": 0.98},
-        "title_color": {"red": 0.02, "green": 0.35, "blue": 0.30},
-        "body_color": {"red": 0.15, "green": 0.15, "blue": 0.15},
-        "accent": {"red": 0.02, "green": 0.60, "blue": 0.50},
+        "bullets": [
+            "Zero tailpipe emissions — better for the environment",
+            "Very low fuel cost (electricity vs. gasoline)",
+            "Minimal maintenance — no oil changes needed",
+            "Instant torque for responsive acceleration",
+            "Eligible for government tax credits and incentives",
+            "Best for: eco-conscious drivers, city commuters, tech enthusiasts",
+        ],
     },
     {
         "title": "Hybrid Vehicles",
-        "body": (
-            "• Combines gasoline engine with electric motor\n"
-            "• Significantly improved fuel economy\n"
-            "• Reduced emissions compared to traditional cars\n"
-            "• No range anxiety — gas engine as backup\n"
-            "• Regenerative braking extends brake life\n"
-            "• Best for: Long-distance drivers wanting eco benefits without full EV commitment"
-        ),
-        "layout": "body",
-        "bg_color": {"red": 0.96, "green": 1.0, "blue": 0.93},
-        "title_color": {"red": 0.10, "green": 0.38, "blue": 0.08},
-        "body_color": {"red": 0.15, "green": 0.15, "blue": 0.15},
-        "accent": {"red": 0.25, "green": 0.60, "blue": 0.10},
+        "bullets": [
+            "Combines a gasoline engine with an electric motor",
+            "Significantly improved fuel economy",
+            "Reduced emissions compared to traditional cars",
+            "No range anxiety — gas engine acts as backup",
+            "Regenerative braking extends brake life",
+            "Best for: long-distance drivers wanting eco benefits without full EV commitment",
+        ],
     },
     {
         "title": "Sports Cars",
-        "body": (
-            "• High-performance engines for thrilling acceleration\n"
-            "• Precise, responsive handling and steering\n"
-            "• Aerodynamic design for stability at high speeds\n"
-            "• Advanced braking systems (Brembo, carbon-ceramic)\n"
-            "• Iconic styling and prestige\n"
-            "• Best for: Driving enthusiasts, weekend drivers, motorsport fans"
-        ),
-        "layout": "body",
-        "bg_color": {"red": 1.0, "green": 0.94, "blue": 0.94},
-        "title_color": {"red": 0.50, "green": 0.05, "blue": 0.05},
-        "body_color": {"red": 0.15, "green": 0.15, "blue": 0.15},
-        "accent": {"red": 0.80, "green": 0.10, "blue": 0.10},
+        "bullets": [
+            "High-performance engines for thrilling acceleration",
+            "Precise, responsive handling and steering",
+            "Aerodynamic design for stability at high speeds",
+            "Advanced braking systems (Brembo, carbon-ceramic)",
+            "Iconic styling and prestige",
+            "Best for: driving enthusiasts, weekend drivers, motorsport fans",
+        ],
     },
     {
         "title": "Minivans",
-        "body": (
-            "• Maximum passenger capacity (7–8 seats)\n"
-            "• Sliding rear doors for safe, easy entry/exit\n"
-            "• Flat-folding seats for flexible cargo space\n"
-            "• Family-focused features: entertainment screens, USB ports\n"
-            "• Smooth, quiet ride for long road trips\n"
-            "• Best for: Large families, carpooling, road trip enthusiasts"
-        ),
-        "layout": "body",
-        "bg_color": {"red": 0.97, "green": 0.94, "blue": 1.0},
-        "title_color": {"red": 0.28, "green": 0.08, "blue": 0.45},
-        "body_color": {"red": 0.15, "green": 0.15, "blue": 0.15},
-        "accent": {"red": 0.50, "green": 0.15, "blue": 0.75},
+        "bullets": [
+            "Maximum passenger capacity (7–8 seats)",
+            "Sliding rear doors for safe, easy entry and exit",
+            "Flat-folding seats for flexible cargo space",
+            "Family-focused features: entertainment screens, USB ports",
+            "Smooth, quiet ride for long road trips",
+            "Best for: large families, carpooling, road trip enthusiasts",
+        ],
     },
     {
         "title": "Luxury Vehicles",
-        "body": (
-            "• Premium materials: leather, wood trim, soft-touch surfaces\n"
-            "• Advanced driver-assistance systems (ADAS)\n"
-            "• Superior noise insulation for a quieter cabin\n"
-            "• Cutting-edge infotainment and connectivity\n"
-            "• Enhanced ride comfort with adaptive suspension\n"
-            "• Best for: Business professionals, comfort seekers, technology enthusiasts"
-        ),
-        "layout": "body",
-        "bg_color": {"red": 0.97, "green": 0.96, "blue": 0.90},
-        "title_color": {"red": 0.35, "green": 0.28, "blue": 0.02},
-        "body_color": {"red": 0.15, "green": 0.15, "blue": 0.15},
-        "accent": {"red": 0.65, "green": 0.50, "blue": 0.05},
+        "bullets": [
+            "Premium materials: leather, wood trim, soft-touch surfaces",
+            "Advanced driver-assistance systems (ADAS)",
+            "Superior noise insulation for a quieter cabin",
+            "Cutting-edge infotainment and connectivity",
+            "Enhanced ride comfort with adaptive suspension",
+            "Best for: business professionals, comfort seekers, technology enthusiasts",
+        ],
     },
-    {
-        "title": "Summary: Choosing the Right Car",
-        "body": (
-            "Sedan       →  Efficiency & affordability for daily driving\n"
-            "SUV         →  Space, safety & versatility for families\n"
-            "Pickup Truck →  Power & utility for work and adventure\n"
-            "EV          →  Eco-friendly, low-cost, high-tech driving\n"
-            "Hybrid      →  Fuel savings without range anxiety\n"
-            "Sports Car  →  Performance & excitement on the road\n"
-            "Minivan     →  Comfort & space for large families\n"
-            "Luxury      →  Premium comfort, tech & prestige"
-        ),
-        "layout": "body",
-        "bg_color": {"red": 0.08, "green": 0.15, "blue": 0.30},
-        "title_color": {"red": 1.0, "green": 0.85, "blue": 0.30},
-        "body_color": {"red": 0.90, "green": 0.95, "blue": 1.0},
-        "accent": {"red": 1.0, "green": 0.85, "blue": 0.30},
-    },
+]
+
+SUMMARY_ROWS = [
+    ("Sedan",         "Efficiency & affordability for daily driving"),
+    ("SUV",           "Space, safety & versatility for families"),
+    ("Pickup Truck",  "Power & utility for work and adventure"),
+    ("EV",            "Eco-friendly, low-cost, high-tech driving"),
+    ("Hybrid",        "Fuel savings without range anxiety"),
+    ("Sports Car",    "Performance & excitement on the road"),
+    ("Minivan",       "Comfort & space for large families"),
+    ("Luxury",        "Premium comfort, technology & prestige"),
 ]
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
-PT = 12700  # EMUs per point
-SLIDE_W = 9144000  # EMU  (720 pt)
-SLIDE_H = 5143500  # EMU  (405 pt)
+def set_bg(slide, colour: RGBColor):
+    fill = slide.background.fill
+    fill.solid()
+    fill.fore_color.rgb = colour
 
 
-def emu(pt_val: float) -> int:
-    return int(pt_val * PT)
+def add_textbox(slide, text, left, top, width, height,
+                font_size, bold=False, colour=WHITE, align=PP_ALIGN.LEFT, wrap=True):
+    txb = slide.shapes.add_textbox(left, top, width, height)
+    txb.word_wrap = wrap
+    tf = txb.text_frame
+    tf.word_wrap = wrap
+    p = tf.paragraphs[0]
+    p.alignment = align
+    run = p.add_run()
+    run.text = text
+    run.font.size = Pt(font_size)
+    run.font.bold = bold
+    run.font.color.rgb = colour
+    run.font.name = "Calibri"
+    return txb
 
 
-def rgb(color: dict) -> dict:
-    return {"rgbColor": color}
-
-
-def solid_fill(color: dict) -> dict:
-    return {"solidFill": {"color": rgb(color)}}
-
-
-def pt_size(pt: float) -> dict:
-    return {"magnitude": pt, "unit": "PT"}
-
-
-def new_text_box(object_id: str, x: float, y: float, w: float, h: float) -> dict:
-    """Returns a createShape request for a text box (dimensions in points)."""
-    return {
-        "createShape": {
-            "objectId": object_id,
-            "shapeType": "TEXT_BOX",
-            "elementProperties": {
-                "pageObjectId": "{{SLIDE_ID}}",  # replaced at call time
-                "size": {
-                    "width": {"magnitude": emu(w), "unit": "EMU"},
-                    "height": {"magnitude": emu(h), "unit": "EMU"},
-                },
-                "transform": {
-                    "scaleX": 1,
-                    "scaleY": 1,
-                    "translateX": emu(x),
-                    "translateY": emu(y),
-                    "unit": "EMU",
-                },
-            },
-        }
-    }
+def add_rect(slide, colour: RGBColor, left, top, width, height):
+    shape = slide.shapes.add_shape(
+        1,  # MSO_SHAPE_TYPE.RECTANGLE
+        left, top, width, height
+    )
+    shape.fill.solid()
+    shape.fill.fore_color.rgb = colour
+    shape.line.fill.background()   # no border
+    return shape
 
 
 # ---------------------------------------------------------------------------
-# Authentication
+# Slide builders
 # ---------------------------------------------------------------------------
 
-def get_credentials() -> Credentials:
-    creds = None
-    token_path = "token.json"
-    creds_path = "credentials.json"
+W = Inches(10)
+H = Inches(7.5)
 
-    if os.path.exists(token_path):
-        creds = Credentials.from_authorized_user_file(token_path, SCOPES)
 
-    if not creds or not creds.valid:
-        if creds and creds.expired and creds.refresh_token:
-            creds.refresh(Request())
-        else:
-            if not os.path.exists(creds_path):
-                raise FileNotFoundError(
-                    "credentials.json not found.\n"
-                    "Download it from Google Cloud Console → APIs & Services → Credentials."
-                )
-            flow = InstalledAppFlow.from_client_secrets_file(creds_path, SCOPES)
-            creds = flow.run_local_server(port=0)
+def build_title_slide(prs):
+    slide = prs.slides.add_slide(prs.slide_layouts[6])  # blank
+    set_bg(slide, DARK_BLUE)
 
-        with open(token_path, "w") as f:
-            f.write(creds.to_json())
+    # Decorative gold bar
+    add_rect(slide, GOLD, Inches(0), Inches(3.1), W, Inches(0.08))
 
-    return creds
+    # Main title
+    add_textbox(
+        slide, "Types of Cars & Their Benefits",
+        Inches(0.6), Inches(1.6), Inches(8.8), Inches(1.3),
+        font_size=44, bold=True, colour=WHITE, align=PP_ALIGN.CENTER,
+    )
+
+    # Subtitle
+    add_textbox(
+        slide, "A guide to choosing the right vehicle for you",
+        Inches(0.6), Inches(3.3), Inches(8.8), Inches(0.8),
+        font_size=22, bold=False, colour=GOLD, align=PP_ALIGN.CENTER,
+    )
+
+
+def build_content_slide(prs, title: str, bullets: list):
+    slide = prs.slides.add_slide(prs.slide_layouts[6])
+    set_bg(slide, LIGHT_GREY)
+
+    accent = ACCENTS.get(title, DARK_BLUE)
+
+    # Top accent bar
+    add_rect(slide, accent, Inches(0), Inches(0), W, Inches(1.1))
+
+    # Title text on bar
+    add_textbox(
+        slide, title,
+        Inches(0.4), Inches(0.12), Inches(9.2), Inches(0.85),
+        font_size=32, bold=True, colour=WHITE,
+    )
+
+    # Bullet points
+    txb = slide.shapes.add_textbox(Inches(0.5), Inches(1.3), Inches(9.0), Inches(5.8))
+    txb.word_wrap = True
+    tf = txb.text_frame
+    tf.word_wrap = True
+
+    for i, bullet in enumerate(bullets):
+        p = tf.paragraphs[0] if i == 0 else tf.add_paragraph()
+        p.space_before = Pt(6)
+        run = p.add_run()
+        run.text = f"  •  {bullet}"
+        run.font.size = Pt(19)
+        run.font.color.rgb = RGBColor(0x1A, 0x1A, 0x1A)
+        run.font.name = "Calibri"
+
+        # Bold "Best for:" label
+        if bullet.startswith("Best for:"):
+            run.font.bold = True
+            run.font.color.rgb = accent
+
+
+def build_summary_slide(prs):
+    slide = prs.slides.add_slide(prs.slide_layouts[6])
+    set_bg(slide, DARK_BLUE)
+
+    # Gold top bar
+    add_rect(slide, GOLD, Inches(0), Inches(0), W, Inches(1.1))
+    add_textbox(
+        slide, "Summary: Choosing the Right Car",
+        Inches(0.4), Inches(0.12), Inches(9.2), Inches(0.85),
+        font_size=30, bold=True, colour=DARK_BLUE,
+    )
+
+    # Two-column table layout
+    col1_x = Inches(0.5)
+    col2_x = Inches(5.2)
+    row_h   = Inches(0.66)
+    start_y = Inches(1.3)
+
+    for i, (car_type, benefit) in enumerate(SUMMARY_ROWS):
+        y = start_y + i * row_h
+
+        # Alternating row highlight
+        if i % 2 == 0:
+            add_rect(slide, RGBColor(0x1E, 0x35, 0x5E), Inches(0.3), y - Inches(0.04),
+                     Inches(9.4), row_h)
+
+        add_textbox(
+            slide, car_type,
+            col1_x, y, Inches(4.4), row_h,
+            font_size=17, bold=True, colour=GOLD,
+        )
+        add_textbox(
+            slide, benefit,
+            col2_x, y, Inches(4.6), row_h,
+            font_size=17, bold=False, colour=WHITE,
+        )
 
 
 # ---------------------------------------------------------------------------
-# Presentation builder
+# Main
 # ---------------------------------------------------------------------------
 
-def build_slide_requests(service, presentation_id: str, slide_data: dict, slide_id: str) -> list:
-    """Returns a list of batchUpdate requests to populate one slide."""
-    requests = []
-    layout = slide_data.get("layout", "body")
-    bg = slide_data["bg_color"]
+def main():
+    prs = Presentation()
+    prs.slide_width  = W
+    prs.slide_height = H
 
-    # Background
-    requests.append({
-        "updatePageProperties": {
-            "objectId": slide_id,
-            "pageProperties": {
-                "pageBackgroundFill": solid_fill(bg)
-            },
-            "fields": "pageBackgroundFill",
-        }
-    })
+    build_title_slide(prs)
 
-    if layout == "title":
-        # ── Title slide ──────────────────────────────────────────────────────
-        title_id = f"{slide_id}_title"
-        subtitle_id = f"{slide_id}_subtitle"
+    for slide_data in CONTENT_SLIDES:
+        build_content_slide(prs, slide_data["title"], slide_data["bullets"])
 
-        # Title box — centered, large
-        requests.append({
-            "createShape": {
-                "objectId": title_id,
-                "shapeType": "TEXT_BOX",
-                "elementProperties": {
-                    "pageObjectId": slide_id,
-                    "size": {
-                        "width": {"magnitude": emu(620), "unit": "EMU"},
-                        "height": {"magnitude": emu(100), "unit": "EMU"},
-                    },
-                    "transform": {
-                        "scaleX": 1, "scaleY": 1,
-                        "translateX": emu(50), "translateY": emu(120),
-                        "unit": "EMU",
-                    },
-                },
-            }
-        })
-        requests.append({
-            "insertText": {"objectId": title_id, "text": slide_data["title"]}
-        })
-        requests.append({
-            "updateTextStyle": {
-                "objectId": title_id,
-                "style": {
-                    "bold": True,
-                    "fontSize": pt_size(40),
-                    "foregroundColor": solid_fill(slide_data["title_color"]),
-                    "fontFamily": "Google Sans",
-                },
-                "fields": "bold,fontSize,foregroundColor,fontFamily",
-            }
-        })
-        requests.append({
-            "updateParagraphStyle": {
-                "objectId": title_id,
-                "style": {"alignment": "CENTER"},
-                "fields": "alignment",
-            }
-        })
+    build_summary_slide(prs)
 
-        # Subtitle box
-        requests.append({
-            "createShape": {
-                "objectId": subtitle_id,
-                "shapeType": "TEXT_BOX",
-                "elementProperties": {
-                    "pageObjectId": slide_id,
-                    "size": {
-                        "width": {"magnitude": emu(580), "unit": "EMU"},
-                        "height": {"magnitude": emu(60), "unit": "EMU"},
-                    },
-                    "transform": {
-                        "scaleX": 1, "scaleY": 1,
-                        "translateX": emu(70), "translateY": emu(240),
-                        "unit": "EMU",
-                    },
-                },
-            }
-        })
-        requests.append({
-            "insertText": {"objectId": subtitle_id, "text": slide_data["subtitle"]}
-        })
-        requests.append({
-            "updateTextStyle": {
-                "objectId": subtitle_id,
-                "style": {
-                    "fontSize": pt_size(20),
-                    "foregroundColor": solid_fill(slide_data["body_color"]),
-                    "fontFamily": "Google Sans",
-                },
-                "fields": "fontSize,foregroundColor,fontFamily",
-            }
-        })
-        requests.append({
-            "updateParagraphStyle": {
-                "objectId": subtitle_id,
-                "style": {"alignment": "CENTER"},
-                "fields": "alignment",
-            }
-        })
-
-    else:
-        # ── Content slide ────────────────────────────────────────────────────
-        title_id = f"{slide_id}_title"
-        body_id = f"{slide_id}_body"
-        accent_bar_id = f"{slide_id}_accent"
-
-        # Accent bar (left edge)
-        accent_color = slide_data.get("accent", {"red": 0.2, "green": 0.4, "blue": 0.8})
-        requests.append({
-            "createShape": {
-                "objectId": accent_bar_id,
-                "shapeType": "RECTANGLE",
-                "elementProperties": {
-                    "pageObjectId": slide_id,
-                    "size": {
-                        "width": {"magnitude": emu(8), "unit": "EMU"},
-                        "height": {"magnitude": emu(300), "unit": "EMU"},
-                    },
-                    "transform": {
-                        "scaleX": 1, "scaleY": 1,
-                        "translateX": emu(36), "translateY": emu(52),
-                        "unit": "EMU",
-                    },
-                },
-            }
-        })
-        requests.append({
-            "updateShapeProperties": {
-                "objectId": accent_bar_id,
-                "shapeProperties": {
-                    "shapeBackgroundFill": solid_fill(accent_color),
-                    "outline": {"outlineFill": solid_fill(accent_color)},
-                },
-                "fields": "shapeBackgroundFill,outline",
-            }
-        })
-
-        # Title
-        requests.append({
-            "createShape": {
-                "objectId": title_id,
-                "shapeType": "TEXT_BOX",
-                "elementProperties": {
-                    "pageObjectId": slide_id,
-                    "size": {
-                        "width": {"magnitude": emu(600), "unit": "EMU"},
-                        "height": {"magnitude": emu(55), "unit": "EMU"},
-                    },
-                    "transform": {
-                        "scaleX": 1, "scaleY": 1,
-                        "translateX": emu(58), "translateY": emu(44),
-                        "unit": "EMU",
-                    },
-                },
-            }
-        })
-        requests.append({
-            "insertText": {"objectId": title_id, "text": slide_data["title"]}
-        })
-        requests.append({
-            "updateTextStyle": {
-                "objectId": title_id,
-                "style": {
-                    "bold": True,
-                    "fontSize": pt_size(28),
-                    "foregroundColor": solid_fill(slide_data["title_color"]),
-                    "fontFamily": "Google Sans",
-                },
-                "fields": "bold,fontSize,foregroundColor,fontFamily",
-            }
-        })
-
-        # Body
-        requests.append({
-            "createShape": {
-                "objectId": body_id,
-                "shapeType": "TEXT_BOX",
-                "elementProperties": {
-                    "pageObjectId": slide_id,
-                    "size": {
-                        "width": {"magnitude": emu(600), "unit": "EMU"},
-                        "height": {"magnitude": emu(240), "unit": "EMU"},
-                    },
-                    "transform": {
-                        "scaleX": 1, "scaleY": 1,
-                        "translateX": emu(58), "translateY": emu(108),
-                        "unit": "EMU",
-                    },
-                },
-            }
-        })
-        requests.append({
-            "insertText": {"objectId": body_id, "text": slide_data["body"]}
-        })
-        requests.append({
-            "updateTextStyle": {
-                "objectId": body_id,
-                "style": {
-                    "fontSize": pt_size(16),
-                    "foregroundColor": solid_fill(slide_data["body_color"]),
-                    "fontFamily": "Google Sans",
-                },
-                "fields": "fontSize,foregroundColor,fontFamily",
-            }
-        })
-
-    return requests
-
-
-def create_presentation() -> str:
-    creds = get_credentials()
-    service = build("slides", "v1", credentials=creds)
-
-    # Create blank presentation
-    presentation = service.presentations().create(
-        body={"title": "Types of Cars & Their Benefits"}
-    ).execute()
-    presentation_id = presentation["presentationId"]
-    print(f"Created presentation: https://docs.google.com/presentation/d/{presentation_id}/edit")
-
-    # The API auto-creates one blank slide; get its ID
-    existing_slide_id = presentation["slides"][0]["objectId"]
-
-    all_requests = []
-
-    # Build all slide-creation requests first (except first slide which exists)
-    slide_ids = []
-    for i, slide_data in enumerate(SLIDES):
-        if i == 0:
-            slide_id = existing_slide_id
-        else:
-            slide_id = f"slide_{i}"
-            all_requests.append({
-                "createSlide": {
-                    "objectId": slide_id,
-                    "insertionIndex": i,
-                    "slideLayoutReference": {"predefinedLayout": "BLANK"},
-                }
-            })
-        slide_ids.append(slide_id)
-
-    # Execute slide creation first
-    if all_requests:
-        service.presentations().batchUpdate(
-            presentationId=presentation_id,
-            body={"requests": all_requests}
-        ).execute()
-
-    # Now populate each slide individually (avoids object-id conflicts)
-    for slide_id, slide_data in zip(slide_ids, SLIDES):
-        content_requests = build_slide_requests(service, presentation_id, slide_data, slide_id)
-        service.presentations().batchUpdate(
-            presentationId=presentation_id,
-            body={"requests": content_requests}
-        ).execute()
-        print(f"  ✓ Slide added: {slide_data['title']}")
-
-    print(f"\nDone! Open your presentation:")
-    print(f"  https://docs.google.com/presentation/d/{presentation_id}/edit")
-    return presentation_id
+    output = "car_types_presentation.pptx"
+    prs.save(output)
+    print(f"Saved: {output}")
+    print()
+    print("To open in Google Slides:")
+    print("  1. Go to slides.google.com")
+    print("  2. Click File → Import slides  (or drag the file into Drive)")
 
 
 if __name__ == "__main__":
-    create_presentation()
+    main()
